@@ -142,7 +142,7 @@ def get_changed_files() -> list[str]:
     """
     try:
         result = subprocess.run(
-            ["git", "diff", "--name-only", "HEAD"],
+            ["git", "diff", "--name-only", "--relative", "HEAD"],
             cwd=str(PROJECT_ROOT),
             capture_output=True,
             text=True,

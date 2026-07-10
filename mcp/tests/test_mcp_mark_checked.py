@@ -22,13 +22,20 @@ def clean_state_db():
         os.remove(DB_PATH)
 
 
+# ── 占位测试类（供 PYTEST 类目标校验测试引用）─────────────
+
+class TestPlaceholder:
+    """Placeholder test class for mark_checked PYTEST class-target validation."""
+    pass
+
+
 # ── AC-1: PYTEST 类目标存在 ────────────────────────────────
 
 def test_valid_pytest_class_target():
     """AC-1: PYTEST 证据，类目标存在 → accepted=True"""
     req = MarkCheckedRequest(
         item_id="AC-1",
-        evidence_url="tests/test_k12_facts.py::TestNormalizeSubject",
+        evidence_url="tests/test_mcp_mark_checked.py::TestPlaceholder",
         evidence_type=EvidenceType.PYTEST,
     )
     accepted, reason = validate_evidence(req)
@@ -42,7 +49,7 @@ def test_valid_pytest_func_target():
     """AC-2: PYTEST 证据，函数目标存在 → accepted=True"""
     req = MarkCheckedRequest(
         item_id="AC-2",
-        evidence_url="tests/test_k12_facts.py::test_my_prefix",
+        evidence_url="tests/test_mcp_timebox.py::test_start_timebox_normal",
         evidence_type=EvidenceType.PYTEST,
     )
     accepted, reason = validate_evidence(req)
@@ -70,7 +77,7 @@ def test_invalid_pytest_target_not_found():
     """AC-4: PYTEST 证据，目标在文件中找不到 → accepted=False"""
     req = MarkCheckedRequest(
         item_id="AC-4",
-        evidence_url="tests/test_k12_facts.py::TestNonexistentClass",
+        evidence_url="tests/test_mcp_timebox.py::TestNonexistentClass",
         evidence_type=EvidenceType.PYTEST,
     )
     accepted, reason = validate_evidence(req)
@@ -84,7 +91,7 @@ def test_valid_git_commit_short():
     """AC-5: GIT_LOG 证据，真实 short hash → accepted=True"""
     req = MarkCheckedRequest(
         item_id="AC-5",
-        evidence_url="980b93f",
+        evidence_url="0f292df",
         evidence_type=EvidenceType.GIT_LOG,
     )
     accepted, reason = validate_evidence(req)
@@ -153,7 +160,7 @@ def test_mark_checked_logs_to_sqlite(clean_state_db):
     """AC-10: 调用后 SQLite 有记录"""
     result = mark_checked(
         item_id="AC-10",
-        evidence_url="tests/test_k12_facts.py::TestNormalizeSubject",
+        evidence_url="tests/test_mcp_mark_checked.py::TestPlaceholder",
         evidence_type="pytest",
     )
     assert result["accepted"] is True
