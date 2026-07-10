@@ -1,9 +1,20 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+
+# SQLite state (runtime only, not version-controlled)
+*.db
+state.db
+
+# OS
+.DS_Store
+Thumbs.db
+
 # Historical SOP versions (not in this repo)
 v1.0/
 v2.0/
 v3-迭代版/
 v3.0-文件架构规划.md
-
-# OS
-.DS_Store
-Thumbs.db
