@@ -1,91 +1,104 @@
-# SOP — 并行开发规程
+# Parallel Development Protocol — 并行开发规程
 
-> 并行开发方法论的多版本归档目录。
+> A conversation-driven multi-AI collaborative development methodology. From an empty directory to project release.
+> 对话驱动的多 AI 协作开发方法论。从空白目录到项目发版。
 
 ---
 
-## 目录结构
+## Directory Structure · 目录结构
 
 ```
-F:\docs\SOP\
-├── README.md              # 本文件
-├── v1.0/                  # 并行开发 SOP v1.0（EducationalServices 项目实战产出）
-├── v2.0/                  # 并行开发规程 v2.0（对话驱动 + 渐进冻结）
-├── v3-迭代版/             # v3.0 迭代记录（含设计理由/记忆点/实验数据，非正式规程）
-├── v3.0/                  # v3.0 正式版（自包含完整规程，当前编写中）
-└── v3.0-文件架构规划.md   # v3.0 文件架构规划文档
+protocol/
+├── README.md              # This file · 本文件
+├── zh/                    # 中文版 (Chinese)
+│   ├── 00-总纲.md
+│   ├── 01-串行对话-Round0至Round2b.md
+│   ├── 02-串行对话-Round3至Round5与启动门.md
+│   ├── 03-并行开发与收尾-Round6至Round8.md
+│   ├── 04-附录-触发器与模板全集.md
+│   ├── 05-操作速查卡.md
+│   ├── 06-约束介质与MCP.md
+│   ├── 07-继承介质与介入机制.md
+│   └── 08-前端与异步分工.md
+├── en/                    # English 英文版
+│   ├── 00-Overview.md
+│   ├── 01-Serial-Conversation-Round0-to-Round2b.md
+│   ├── 02-Serial-Conversation-Round3-to-Round5-and-Launch-Gate.md
+│   ├── 03-Parallel-Development-and-WrapUp-Round6-to-Round8.md
+│   ├── 04-Appendix-Triggers-and-Templates.md
+│   ├── 05-Quick-Reference-Card.md
+│   ├── 06-Constraint-Media-and-MCP.md
+│   ├── 07-Inheritance-Media-and-Intervention.md
+│   └── 08-Frontend-and-Async-Division.md
+└── .gitignore
 ```
 
 ---
 
-## 版本说明
+## Version · 版本
 
-| 版本 | 日期 | 定位 | 状态 |
-|---|---|---|---|
-| v1.0 | 2026-06-11 | 并行开发 SOP，基于 EducationalServices 项目实战 | 归档 |
-| v2.0 | 2026-06-15 | 对话驱动 + 渐进冻结 + 三轨分级 | 归档 |
-| v3-迭代版 | 2026-07-03 | v3.0 的迭代记录，含设计理由/记忆点/实验数据/踩坑反思 | 归档（素材源） |
-| v3.0 | 2026-07-03 | 正式版，自包含完整规程 | 编写中 |
-
----
-
-## v3.0 编写逻辑
-
-### 核心原则：自包含
-
-**v3.0 正式版是独立的完整规程，不引用外部版本。** 读者不需要翻阅 v1.0/v2.0 就能执行全部流程。
-
-具体要求：
-- **不写"v2.0 保留"、"继承自 v2.0"、"详见 v2.0"** 等引用措辞
-- v2.0 流程骨架（Round 0-8 / 三轨 / 冻结 / 触发器）的完整内容直接写入 v3.0 自己的文件
-- 所有规则、模板、检查清单直接陈述，不标注来源版本
-- 版本号段只写 v3.0 自身，不列历史版本
-
-### 与迭代版的关系
-
-| 维度 | v3-迭代版 | v3.0 正式版 |
+| Version | Date | Description |
 |---|---|---|
-| 定位 | 修改和扩展的总集，有故事有记忆点 | 纯规程，可执行 |
-| 内容 | 含设计理由/实验数据/踩坑反思/反例/记忆点 | 只含"该怎么做" |
-| 关系 | 正式版的素材源 | 从迭代版提取纯规程内容 |
+| v3.0 | 2026-07-03 | Formal release · 正式版 — self-contained complete protocol · 自包含完整规程 |
 
-正式版编写时从迭代版提取规则本身，去掉所有记忆点/实验数据/反例/设计理由。
+---
 
-### 文件结构（9 份）
+## What's Inside · 内容概述
 
-```
-v3.0/
-├── 00-总纲.md                              # 哲学+范式+流程总览+机制速览+条款索引
-├── 01-串行对话-Round0至Round2b.md           # 项目播种→需求→技术栈→目录+契约冻结
-├── 02-串行对话-Round3至Round5与启动门.md     # 规范→DB+记忆架构→框架+SSE+危机短路→冻结审计+启动门
-├── 03-并行开发与收尾-Round6至Round8.md       # 并行(含Agent降级/前端收束)→整合(含评测分级)→发版(含场景化回归/验收锁)
-├── 04-附录-触发器与模板全集.md               # 触发器+决策记录+PPM+继承快照+介入请求+MCP引用
-├── 05-操作速查卡.md                         # 每轮动作+Runbook+验收锁+MCP+介入速查
-├── 06-约束介质与MCP.md                      # L0/L1/L2三层+MCP三tool+声明卡+验收锁
-├── 07-继承介质与介入机制.md                  # 分叉/子智能体/快照+升级四档+状态机+平台分支
-└── 08-前端与异步分工.md                      # 完成定义/视角收束/单源View/DS分工/执行方先行
-```
+**9 files, 21 clauses, 65+ triggers.** Three-domain coverage:
 
-### 编写顺序
+- **Complete Development Process**: Rounds 0–8 Serial → Parallel → Wrap-Up, including frontend and AI Agent engineering nodes
+- **Full Business Development Paradigms**: CRUD + Frontend + AI Agent (RAG / Memory / SSE / Degradation / Prompt versioning / Crisis short-circuit) + Async division
+- **Special Mechanisms**: Constraint media stratification (L0/L1/L2) + Inheritance media (Fork / Sub-agent / Snapshot) + Intervention (four escalation tiers) + MCP tools + Declaration Card + Acceptance Lock + Environment Runbook
 
-按依赖关系编写，逐份确认：
-
-1. 00-总纲（其他文件的索引基础）
-2. 06-约束介质与MCP（被 01/02/03 引用）
-3. 07-继承介质与介入机制（被 01/02/03 引用）
-4. 08-前端与异步分工（被 01/02/03 引用）
-5. 01-Round0至2b（流程起点）
-6. 02-Round3至5与启动门（流程中段）
-7. 03-Round6至8（流程末段）
-8. 04-附录（模板全集）
-9. 05-速查卡（速查全集）
-
-### 三件事全覆盖
+**9 份文件、21 条条款、65+ 触发器。** 三件事全覆盖：
 
 - **完整开发流程**：Round 0-8 串行→并行→收尾，含前端和 AI Agent 工程节点
 - **全业务开发范式**：CRUD + 前端 + AI Agent + 异步分工
-- **特殊机制补充**：约束介质分层 + 继承介质 + 介入机制 + MCP tool + 声明卡 + 验收锁 + Runbook
+- **特殊机制**：约束介质分层 + 继承介质 + 介入机制 + MCP + 声明卡 + 验收锁 + Runbook
 
-### 21 条条款嵌入 Round 流程
+---
 
-v3.0 的 21 条条款不是孤立的 06/07/08 号文件内容，而是嵌入到对应 Round 步骤里的可执行节点。06/07/08 是详解和模板，Round 流程里引用它们。条款索引见 `v3.0/00-总纲.md` §十。
+## File Map · 文件导航
+
+| # | EN | ZH | Content | When to Read |
+|---|---|---|---|---|
+| 00 | [Overview](en/00-Overview.md) | [总纲](zh/00-总纲.md) | Philosophy, process overview, tracks, freeze rules, clause index | First |
+| 01 | [Rounds 0–2b](en/01-Serial-Conversation-Round0-to-Round2b.md) | [Round 0–2b](zh/01-串行对话-Round0至Round2b.md) | Seeding → Requirements → Tech stack → Directory + Contract freeze | Project startup |
+| 02 | [Rounds 3–5 & Gate](en/02-Serial-Conversation-Round3-to-Round5-and-Launch-Gate.md) | [Round 3–5 与启动门](zh/02-串行对话-Round3至Round5与启动门.md) | Standards → DB+Memory → Framework+SSE+Crisis → Freeze audit + Gate | After R2b |
+| 03 | [Rounds 6–8](en/03-Parallel-Development-and-WrapUp-Round6-to-Round8.md) | [Round 6–8](zh/03-并行开发与收尾-Round6至Round8.md) | Parallel coding → Integration → Release | After gate |
+| 04 | [Appendix](en/04-Appendix-Triggers-and-Templates.md) | [附录](zh/04-附录-触发器与模板全集.md) | All triggers, decision record, PPM, snapshot, intervention templates | Quick lookup |
+| 05 | [Quick Ref](en/05-Quick-Reference-Card.md) | [速查卡](zh/05-操作速查卡.md) | Per-round actions, Runbook, acceptance lock, MCP, intervention | Keep open |
+| 06 | [Constraint & MCP](en/06-Constraint-Media-and-MCP.md) | [约束介质与MCP](zh/06-约束介质与MCP.md) | L0/L1/L2 layers, MCP specs, Declaration Card, Acceptance Lock | Rules deep-dive |
+| 07 | [Inheritance & Intervention](en/07-Inheritance-Media-and-Intervention.md) | [继承介质与介入](zh/07-继承介质与介入机制.md) | Fork/Sub-agent/Snapshot, escalation, state machine, platform matrix | Collaboration deep-dive |
+| 08 | [Frontend & Async](en/08-Frontend-and-Async-Division.md) | [前端与异步分工](zh/08-前端与异步分工.md) | Completion def, perspective convergence, single-source View, executor-first | Frontend/division |
+
+---
+
+## Reading Order · 阅读顺序
+
+1. **00-Overview** — understand the philosophy and landscape
+2. **06-Constraint-Media-and-MCP** — how rules take effect (referenced by 01/02/03)
+3. **07-Inheritance-Media-and-Intervention** — cross-session collaboration (referenced by 01/02/03)
+4. **08-Frontend-and-Async-Division** — frontend & division protocol (referenced by 01/02/03)
+5. **01 → 02 → 03** — execute the full workflow
+6. **04-Appendix** — template library for execution
+7. **05-Quick-Reference-Card** — keep open alongside during execution
+
+---
+
+## Key Features · 核心特性
+
+- **Three-Tier Freeze**: Hard-Freeze / Soft-Freeze / Draft — progressive certainty
+- **Three Tracks**: Demo Mode / Standard / Premium — fit project scale
+- **Launch Gate**: 8 hard conditions before parallelization
+- **5-Dimension Audit**: Code standards + Dynamic testing + Contract consistency + Docs + Postmortem
+- **21 Embedded Clauses**: §4.1–§4.21 woven into Round workflow
+- **Platform Branching**: v3.0-ZCode (fork + sub-agent) / v3.0-Generic (snapshot mailbox)
+
+---
+
+## Related Repositories · 相关仓库
+
+- [UpgradeES](https://github.com/canyupro/UpgradeES) — Reference implementation (K12 education platform)
+- [protocol-mcp](https://github.com/canyupro/protocol) — This repository
