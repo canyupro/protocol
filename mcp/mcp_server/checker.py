@@ -100,3 +100,88 @@ def _validate_screenshot(evidence_url: str) -> tuple[bool, str]:
     if file_path.exists() and "docs" in str(file_path):
         return True, f"SCREENSHOT 证据有效: {evidence_url}"
     return False, f"截图文件不存在或不在 docs/ 下: {file_path}"
+
+
+# ── Phase 4: Tool Expansion (覆盖率 / 冻结检测 / 快照校验) ──
+
+# 继承快照必填字段：每个条目是 (中文关键词, 英文关键词) 对
+REQUIRED_SNAPSHOT_FIELDS: list[tuple[str, str]] = [
+    ("workflow_state", "workflow_state"),
+    ("当前角色", "Current role"),
+    ("任务阶段", "Task stage"),
+    ("已冻结决策", "Frozen Decision"),
+    ("待定项", "Pending"),
+    ("下一步", "Next Step"),
+]
+
+
+def parse_coverage(cov_output: str) -> tuple[float, str] | None:
+    """
+    解析 pytest --cov-report=term 输出，提取 TOTAL 行的覆盖率百分比。
+
+    返回 (coverage_percent, total_line)。找不到 TOTAL 行则返回 None。
+    """
+    if not cov_output.strip():
+        return None
+
+    # 匹配 TOTAL 行: TOTAL   <any>   <any>   <coverage>%
+    pattern = r"TOTAL\s+\d+\s+\d+\s+(\d+(?:\.\d+)?)%"
+    match = re.search(pattern, cov_output)
+    if not match:
+        return None
+
+    coverage_percent = float(match.group(1))
+    total_line = match.group(0).strip()
+    return coverage_percent, total_line
+
+
+def get_changed_files() -> list[str]:
+    """
+    执行 git diff --name-only HEAD，返回当前工作区改动文件列表（相对路径）。
+    git 不可用时返回空列表。
+    """
+    try:
+        result = subprocess.run(
+            ["git", "diff", "--name-only", "HEAD"],
+            cwd=str(PROJECT_ROOT),
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        if result.returncode != 0:
+            return []
+        lines = [ln.strip() for ln in result.stdout.splitlines() if ln.strip()]
+        return lines
+    except (subprocess.TimeoutExpired, FileNotFoundError):
+        return []
+
+
+def check_freeze_violation(frozen_files: list[str], changed_files: list[str]) -> list[str]:
+    """返回 frozen_files 中出现在 changed_files 里的文件列表（交集）。"""
+    changed_set = set(changed_files)
+    return [f for f in frozen_files if f in changed_set]
+
+
+def check_snapshot_completeness(snapshot_path: Path) -> tuple[list[str], list[str]]:
+    """
+    校验继承快照是否包含所有必填字段。
+
+    支持中英文双语搜索——每个字段的 (中文关键词, 英文关键词) 对中，
+    只要在文件内容中找到其中一个即视为存在。
+
+    返回 (found_fields, missing_fields)。
+    """
+    if not snapshot_path.exists():
+        missing = [zh for zh, _ in REQUIRED_SNAPSHOT_FIELDS]
+        return [], missing
+
+    content = snapshot_path.read_text(encoding="utf-8")
+
+    found: list[str] = []
+    missing: list[str] = []
+    for zh, en in REQUIRED_SNAPSHOT_FIELDS:
+        if zh in content or en in content:
+            found.append(zh)
+        else:
+            missing.append(zh)
+    return found, missing

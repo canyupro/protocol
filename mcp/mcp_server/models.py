@@ -95,3 +95,69 @@ class ReportStepResult(BaseModel):
     reported_at: str        # ISO8601 时间戳
     accepted: bool
     message: str
+
+
+# ── Phase 4: Tool Expansion (时间盒 / 覆盖率 / 冻结检测 / 快照校验) ──
+
+
+class RiskLevel(str, Enum):
+    """时间盒风险等级。normal=5轮红灯，high=2轮红灯。"""
+    NORMAL = "normal"
+    HIGH = "high"
+
+
+class StartTimeboxRequest(BaseModel):
+    """start_timebox tool 的入参。"""
+    step_id: str = Field(..., description="步骤标识，如 R6-chain1-task-001")
+    max_minutes: int = Field(..., description="超时阈值（分钟）")
+    risk_level: RiskLevel = Field(..., description="风险等级")
+
+
+class StartTimeboxResult(BaseModel):
+    """start_timebox tool 的返回。"""
+    timer_id: int
+    step_id: str
+    max_minutes: int
+    risk_level: RiskLevel
+    started_at: str         # ISO8601 时间戳
+    started: bool
+    message: str
+
+
+class CheckTimeboxResult(BaseModel):
+    """check_timebox tool 的返回。"""
+    timer_id: int
+    step_id: str
+    max_minutes: int
+    elapsed_minutes: float
+    exceeded: bool
+    risk_level: RiskLevel
+    message: str
+
+
+class ValidateCoverageResult(BaseModel):
+    """validate_coverage tool 的返回。"""
+    accepted: bool
+    coverage_percent: float
+    threshold: float
+    total_line: str
+    message: str
+
+
+class VerifyFreezeResult(BaseModel):
+    """verify_freeze tool 的返回。"""
+    accepted: bool
+    frozen_count: int
+    changed_count: int
+    violated_files: list[str]
+    message: str
+
+
+class SnapshotCheckResult(BaseModel):
+    """snapshot_check tool 的返回。"""
+    accepted: bool
+    snapshot_path: str
+    total_fields: int
+    found_fields: int
+    missing_fields: list[str]
+    message: str
