@@ -194,6 +194,33 @@ Executor reads snapshot reply → continues construction
 | Context | Sub-agent independent context (needs snapshot supplement) | Fork inheritance or snapshot recovery |
 | Audit trail | Sub-agent return + snapshot | Snapshot file |
 
+### 4.6 Cold-Start Review (§4.22)
+
+#### Positioning
+
+The intervention mechanism's existing direction is "bottom-up" — the executor requests the dispatcher to supplement design or decide. Cold-Start Review adds the "lateral" direction: use a third-party cold start to re-verify whether **the coordinator itself** has drifted from the original requirement.
+
+#### The Problem It Solves: Attention Drift
+
+In long conversations, the coordinator's (or any direction-owner's) understanding of the original requirement gets diluted by context accumulated during execution — the main direction stays unchanged, but small-direction execution details pile up, gradually squeezing out mainline attention until it "can't be pulled back." This is not the model getting weaker; it's attention drift.
+
+Key insight: **context compression does not fix it**. Compression is proportional lossy compression — when the small direction dominates, it still dominates after compression; the dilution is not corrected. Compression solves "doesn't fit," not "share imbalance" — the two are orthogonal.
+
+#### Mechanism
+
+| Aspect | Rule |
+|--------|------|
+| Trigger | Accumulated **actual runtime** since the last review reaches 2 hours (automated periodic detection), or manual trigger at any time |
+| Judge | Third-party model cold start — **open a new session**, without prior conversation context, read-only on session records |
+| Action | Read "original requirement + recent conversation," judge whether direction has drifted from the original goal, output a 3–5 sentence conclusion (drifted or not / drift point / how to pull back) |
+| Boundary | Read-only, advisory only, no file modification — the third-party eye "sees + speaks" without "acting," a natural check-and-balance |
+
+#### Why a Backstop Rather Than a Hard Constraint
+
+Attention drift travels the "decision / cognition path," which L2 tools or hooks cannot hard-block (see File 06, the ceiling of constraint media stratification). It can only be re-verified after the fact by a "time-shifted cold-start eye" — echoing Paradigm III "checks-and-balances move from self-triggering to role separation": the check here is not a stronger role, but "role separation across time" (the same coordinator in a long session vs a cold-start new session are two attention states; the latter re-checks the former), avoiding the recursive assumption of "a judge stronger than the coordinator."
+
+> Implementation details (data source, automation setup, platform differences) live in the project's experiment records, not in this protocol — at the methodology level it is platform-agnostic.
+
 ---
 
 ## V. State Machine

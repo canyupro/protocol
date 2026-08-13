@@ -160,13 +160,14 @@ At the end of Round 2b, the coordinator proactively asks whether to upgrade, bas
 | Context Transfer Package | Package accumulated conversation decisions for distribution to agents | At parallel start |
 | Decision Records | Record达成/待定/否决 per round, prevent interruption loss | Every round-end |
 
-### Extension Mechanisms (5 items)
+### Extension Mechanisms (6 items)
 
 | Mechanism | Function | See |
 |---|---|---|
 | Constraint Media Stratification (L0/L1/L2) | Stratify by enforcement strength; hard constraints under weak models | File 06 |
 | Inheritance Media (Fork/Sub-agent/Snapshot) | Cross-session work continuity + role self-identification | File 07 |
 | Intervention Mechanism (Four Escalation Tiers) | Executor mid-construction requests dispatcher | File 07 |
+| Cold-Start Review | Third-party cold start re-checks coordinator direction, preventing attention drift | File 07 §IV |
 | MCP Tools (mark_checked / pause_for_user / report_step) | Evidence enforcement / Fork pause / Report compression | File 06 |
 | Environment Discipline Runbook |固化 at startup; no live debugging | 05-G Quick Ref |
 
@@ -232,7 +233,7 @@ Before MCP落地: rely on role separation + manual acceptance. After MCP落地: 
 
 ---
 
-## X. v3.0 Clause Index (21 Clauses)
+## X. v3.0 Clause Index (22 Clauses)
 
 | # | Clause | Embedded In Round | Detail File |
 |---|---|---|---|
@@ -257,12 +258,13 @@ Before MCP落地: rely on role separation + manual acceptance. After MCP落地: 
 | §4.19 | Evaluation Grading | R7/R8 | 03-R7 |
 | §4.20 | True-Streaming SSE Dual-Track | R4b | 02-R4b |
 | §4.21 | Dependency Addition Workflow | R6 | 03-R6 |
+| §4.22 | Cold-Start Review | Every Round | 07-IV |
 
 ---
 
 ## Version
 
 - v3.0 / 2026-07-03 / Formal Release
-  - 9 files, 21 clauses embedded into Round workflow
+  - 9 files, 22 clauses embedded into Round workflow
   - Three-domain coverage: complete process + full business paradigms + special mechanisms
   - Self-contained complete protocol; no external version references required

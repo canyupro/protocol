@@ -44,7 +44,7 @@ Text-based rules fail as soft constraints against weak models — models can ski
 | Three-Tier Freeze | Hard-freeze / Soft-freeze / Draft + decision rules (see 00-Overview §VII) |
 | Anti-omission (3 layers) | Skeleton-first / PPM / Integrity scan (see 00-Overview §VIII) |
 | Core Rules | pytest output / critical path no-mock / version pinning / 7-layer docs / business-object naming / 70% coverage |
-| 21 Clauses | §4.1–§4.21 (see 00-Overview §X index) |
+| 22 Clauses | §4.1–§4.22 (see 00-Overview §X index) |
 
 ### 2.3 L0 Limitations
 

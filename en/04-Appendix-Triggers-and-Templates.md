@@ -128,6 +128,12 @@
 | T11.8 | Acceptance Lock V1-V10 not all passed | Block |
 | T11.9 | Inheritance snapshot not updated to final version | Flag Yellow |
 
+### Throughout (Every Round)
+
+| # | Condition | Verdict |
+|------|------|------|
+| T12.1 | Accumulated actual runtime ≥2h without a Cold-Start Review | Flag Yellow (trigger §4.22 Cold-Start Review) |
+
 ---
 
 ## B. Decision Record Template
@@ -478,6 +484,29 @@ See Document 07 §四 for details.
 evidence_type allowed values: `pytest` / `ruff` / `git_log` / `screenshot` / `review`
 
 phase allowed values: `read` / `plan` / `implement` / `test` / `wrap_up`
+
+---
+
+## K. Cold-Start Review Output Template (§4.22)
+
+After a third-party model cold-start (new session) reads the session records, output in this format. Read-only, advisory only, no file modification.
+
+```markdown
+# Cold-Start Review — {Session/Project Name} @ {ISO8601}
+
+## Original Requirement
+- {The user's earliest explicit goal}
+
+## Recent Mainline
+- {What the session has most recently been working on}
+
+## Verdict
+1. Drifted: [Yes | No]
+2. Drift point: {If any, specific description}
+3. How to pull back: {Which mainline to return to / concrete action}
+
+> Read-only review: output verdict and advice only; do not modify any files.
+```
 
 ---
 

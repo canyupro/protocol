@@ -18,3 +18,7 @@ v1.0/
 v2.0/
 v3-迭代版/
 v3.0-文件架构规划.md
+
+# Local experiment artifacts (not for git)
+.zcode/
+doc/experiments/
