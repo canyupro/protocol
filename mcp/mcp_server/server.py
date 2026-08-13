@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from datetime import datetime, timezone
 
-from mcp.server.fastmcp import FastMCP
+from mcp.server.mcpserver import MCPServer
 
 from .checker import (
     PROJECT_ROOT,
@@ -48,7 +48,7 @@ from .store import (
 )
 
 # 初始化 MCP server
-mcp = FastMCP("protocol-mcp")
+mcp = MCPServer("protocol-mcp")
 
 
 @mcp.tool()

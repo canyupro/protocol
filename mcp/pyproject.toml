@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "protocol-mcp"
+version = "0.1.0"
+description = "MCP tools implementing L2 hard constraints for the Parallel Development Protocol v3.0"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    # 锁定 MCP SDK 主版本：2.x 移除 fastmcp 模块，改用 mcp.server.mcpserver.MCPServer。
+    # 代码已迁移到 2.x API（见 mcp_server/server.py）。
+    "mcp>=2.0,<3",
+    "pydantic>=2,<3",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8",
+]
+
+[tool.setuptools.packages.find]
+include = ["mcp_server*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
