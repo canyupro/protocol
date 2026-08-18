@@ -1,0 +1,12 @@
+{
+  "name": "protocol-project-area",
+  "version": "0.1.0",
+  "description": "Creates a Protocol project area for new projects and legacy-project intervention, with survey-first workflow and guarded code writes.",
+  "author": {
+    "name": "canyupro"
+  },
+  "license": "MIT",
+  "commands": "commands",
+  "skills": "skills",
+  "hooks": "hooks"
+}

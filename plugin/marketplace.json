@@ -1,0 +1,22 @@
+{
+  "name": "protocol-local",
+  "description": "Local marketplace for the Protocol Project Area Plugin.",
+  "owner": {
+    "name": "canyupro"
+  },
+  "plugins": [
+    {
+      "name": "protocol-project-area",
+      "description": "Survey-first project area for Protocol new-project and legacy-intervention workflows, with guarded code writes.",
+      "version": "0.1.0",
+      "source": "./protocol-project-area",
+      "category": "development",
+      "keywords": [
+        "workflow",
+        "project-area",
+        "guardrails",
+        "legacy-intervention"
+      ]
+    }
+  ]
+}
