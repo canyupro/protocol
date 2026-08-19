@@ -74,6 +74,46 @@ def enable_guard(root: Path) -> str:
     return "created"
 
 
+PROJECT_HOOK_TEMPLATE = """{{
+  "hooks": {{
+    "enabled": true,
+    "events": {{
+      "PreToolUse": [
+        {{
+          "matcher": "Edit|Write",
+          "hooks": [
+            {{
+              "type": "process",
+              "command": "python3",
+              "args": ["{guard_script}"],
+              "timeoutMs": 1000,
+              "statusMessage": "Checking Protocol project-area write guard"
+            }}
+          ]
+        }}
+      ]
+    }}
+  }}
+}}
+"""
+
+
+def write_project_hook(root: Path, guard_script: Path | None = None) -> bool:
+    """生成项目区 `.zcode/config.json`（PreToolUse → 守卫脚本）。
+
+    守卫脚本默认取插件内 hooks/protocol_guard.py 的绝对路径；也可传入项目内副本。
+    仅由人类在客户端完成「工作区 Hook 信任」后才生效，脚本不绕过。
+    """
+    if guard_script is None:
+        guard_script = PLUGIN_ROOT / "hooks" / "protocol_guard.py"
+    destination = root / ".zcode" / "config.json"
+    if destination.exists():
+        return False
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    destination.write_text(PROJECT_HOOK_TEMPLATE.format(guard_script=guard_script), encoding="utf-8")
+    return True
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="创建 Protocol 项目区骨架")
     parser.add_argument("--root", type=Path, default=Path.cwd(), help="项目根或其子目录")
@@ -81,6 +121,11 @@ def main() -> int:
         "--enable-guard",
         action="store_true",
         help="仅在用户确认问卷和 AGENTS 短指针后创建 pending guard",
+    )
+    parser.add_argument(
+        "--project-hook",
+        action="store_true",
+        help="启用 guard 时同时生成项目区 .zcode/config.json（PreToolUse → 守卫脚本）",
     )
     args = parser.parse_args()
     root = find_root(args.root)
@@ -92,6 +137,11 @@ def main() -> int:
             return 2
         if guard_result == "created":
             created.append(Path(".agents/protocol/guard.json"))
+        if args.project_hook:
+            if write_project_hook(root):
+                created.append(Path(".zcode/config.json"))
+            else:
+                print("已存在 .zcode/config.json，未覆盖；请人工检查其 hook 是否指向 Protocol 守卫。", file=sys.stderr)
     print(f"项目根: {root}")
     if created:
         print("已创建:")

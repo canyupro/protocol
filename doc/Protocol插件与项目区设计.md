@@ -25,6 +25,9 @@ Protocol Project Area Plugin 是全局安装的 ZCode 插件，为任意项目�
 | 项目根 `AGENTS.md` | 只放 Protocol 项目区短指针和常设边界 | 不复制规程全文、全局规则或任务细节 |
 | `.agents/protocol/` | 存机器状态、当前任务和关键连接映射 | 不存大段人类架构文档 |
 | `doc/protocol/` | 存问卷、理解图、命名规范、影响面、回顾和人类批准 | 不作为全仓 INDEX |
+| 项目区 `.zcode/config.json` | 项目级 hook（仅在该项目生效，需用户工作区信任） | 不绕过信任门槛 |
+
+> 项目区 hook 说明（2026-08-19 实测）：当前 ZCode 已支持项目区 `.zcode/config.json` 的 hooks，但默认 `pending`，必须在客户端完成「工作区 Hook 信任」后才执行。这正好符合「制衡外移 + 人类兜底」——信任是不可脚本绕过的平台安全动作。
 
 ## 3. 命令生命周期
 
@@ -57,9 +60,16 @@ Protocol Project Area Plugin 是全局安装的 ZCode 插件，为任意项目�
 
 ## 5. 守卫
 
-### 5.1 生效范围
+### 5.1 生效范围（两路可选）
 
-全局插件注册 `PreToolUse` hook，但只在发现 `.agents/protocol/guard.json` 的已初始化项目中生效。未初始化项目完全放行。
+守卫可走两条路径，二者可择一或并用：
+
+| 路径 | 配置位置 | 生效条件 | 优点 |
+|---|---|---|---|
+| **项目区 hook（推荐）** | 项目自己的 `<repo>/.zcode/config.json` | 用户在工作区完成 Hook 信任后 | 天然只对该项目生效，未配置项目完全无 hook；无需全局脚本探测项目根 |
+| **全局插件 hook** | 插件 `hooks/hooks.json` | 插件启用后全局运行，脚本发现 `.agents/protocol/guard.json` 才拦截 | 跨项目统一分发 |
+
+`/protocol:init` 可生成项目区 `.zcode/config.json`（含 guard hook），但**不能绕过信任**：用户需在客户端确认后才生效。信任按工作区身份 + hook 指纹记录，脚本内容变化后可能需重新信任。
 
 hook 仅匹配 `Edit|Write`，不拦截 Bash 间接写入，也不拦截纯文本输出。这是已知硬约束天花板，仍需项目规则、独立验证、人类兜底与冷启动回顾补足。
 

@@ -58,6 +58,16 @@ class InitProjectAreaTest(unittest.TestCase):
         self.assertEqual(init_project_area.enable_guard(self.root), "created")
         self.assertEqual(init_project_area.enable_guard(self.root), "exists")
 
+    def test_project_hook_created_only_with_guard(self) -> None:
+        init_project_area.initialize(self.root)
+        self.assertFalse((self.root / ".zcode/config.json").exists())
+        self.assertTrue(init_project_area.write_project_hook(self.root))
+        config = (self.root / ".zcode/config.json").read_text(encoding="utf-8")
+        self.assertIn("PreToolUse", config)
+        self.assertIn("protocol_guard.py", config)
+        # 幂等：已存在不覆盖
+        self.assertFalse(init_project_area.write_project_hook(self.root))
+
 
 if __name__ == "__main__":
     unittest.main()
