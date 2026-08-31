@@ -62,15 +62,27 @@ def initialize(root: Path) -> list[Path]:
     return created
 
 
-def enable_guard(root: Path) -> str:
-    """创建 pending guard，返回 created / exists / blocked。"""
+def enable_guard(root: Path, mode: str = "standard") -> str:
+    """创建 pending guard，返回 created / exists / blocked。
+
+    mode:
+      - standard: 默认 guard.json（status=pending），由 has_matching_approval 决定拦截
+      - read-only: 公司项目/纯只读场景，guard.json intent=observe-only，
+                   守卫层拒绝所有业务路径，但项目区文档可写
+    """
     guard = root / ".agents/protocol/guard.json"
     if guard.exists():
         return "exists"
     approvals = root / "doc/protocol/approvals"
     if approvals.exists() and any(approvals.iterdir()):
         return "blocked"
-    copy_if_missing(TEMPLATES / "guard.json", guard)
+    payload = {"version": 1, "status": "pending"}
+    if mode == "read-only":
+        payload["intent"] = "observe-only"
+    dest = root / ".agents/protocol/guard.json"
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    import json as _json
+    dest.write_text(_json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     return "created"
 
 
@@ -86,7 +98,7 @@ PROJECT_HOOK_TEMPLATE = """{{
               "type": "process",
               "command": "python3",
               "args": ["{guard_script}"],
-              "timeoutMs": 1000,
+              "timeoutMs": 5000,
               "statusMessage": "Checking Protocol project-area write guard"
             }}
           ]
@@ -114,34 +126,94 @@ def write_project_hook(root: Path, guard_script: Path | None = None) -> bool:
     return True
 
 
+def read_only_mode_enabled(args: argparse.Namespace) -> bool:
+    """检测 --read-only 是否开启。"""
+    return bool(getattr(args, "read_only", False))
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="创建 Protocol 项目区骨架")
     parser.add_argument("--root", type=Path, default=Path.cwd(), help="项目根或其子目录")
+    # ── 守卫三档策略：guard-mode × hook-mode × --read-only ──
+    # 默认：guard=auto（已有 approvals 则不创建）+ hook=on
+    # 修正版：默认双开——guard 必须搭配 hook 才有意义（appcode-fend 翻车教训）
     parser.add_argument(
-        "--enable-guard",
-        action="store_true",
-        help="仅在用户确认问卷和 AGENTS 短指针后创建 pending guard",
+        "--guard", "--enable-guard",
+        dest="guard_mode",
+        choices=["on", "off", "auto"],
+        default="auto",
+        help="guard.json 创建策略：on=无条件创建 / off=不创建 / auto=已有 approvals 时拒绝（默认）",
     )
     parser.add_argument(
-        "--project-hook",
+        "--hook", "--project-hook",
+        dest="hook_mode",
+        choices=["on", "off"],
+        default="on",
+        help=".zcode/config.json 创建策略，默认 on",
+    )
+    parser.add_argument(
+        "--guard-only",
+        action="store_const",
+        dest="hook_mode",
+        const="off",
+        help="只创建 guard.json，不写 .zcode/config.json",
+    )
+    parser.add_argument(
+        "--hook-only",
+        action="store_const",
+        dest="guard_mode",
+        const="off",
+        help="只写 .zcode/config.json，不创建 guard.json（不推荐：hook 会持续 fail-closed）",
+    )
+    parser.add_argument(
+        "--read-only",
         action="store_true",
-        help="启用 guard 时同时生成项目区 .zcode/config.json（PreToolUse → 守卫脚本）",
+        help="公司项目/纯只读场景：跳过 hook 安装，生成 intent=observe-only 的 guard.json（业务路径一律 deny）",
     )
     args = parser.parse_args()
     root = find_root(args.root)
+
+    # read-only 与 hook-only 互斥：read-only 明确跳过 hook
+    if args.read_only and args.hook_mode == "on" and args.guard_mode != "off":
+        # 那就照常生成 hook，让用户在客户端决定是否信任（observe-only 即使 hook 被信任也只放行项目区文档）
+        pass
+
     created = initialize(root)
-    if args.enable_guard:
-        guard_result = enable_guard(root)
+
+    # read-only 模式：创建 observe-only guard，跳过 hook
+    if args.read_only:
+        if args.guard_mode == "off":
+            print("--read-only 与 --guard=off 互斥；忽略 --guard=off，强制启用 observe-only guard。", file=sys.stderr)
+        guard_result = enable_guard(root, mode="read-only")
         if guard_result == "blocked":
             print("拒绝启用 guard：审批目录在守卫启用前已存在内容，请由人类检查后重新初始化。", file=sys.stderr)
             return 2
         if guard_result == "created":
             created.append(Path(".agents/protocol/guard.json"))
-        if args.project_hook:
+        print("[read-only] 已生成 observe-only guard；不安装 hook（公司项目/纯只读场景）。", file=sys.stderr)
+        # 跳过 hook 创建
+    else:
+        # 标准模式：按 guard-mode + hook-mode 创建
+        if args.guard_mode != "off":
+            guard_result = enable_guard(root, mode="standard")
+            if guard_result == "blocked":
+                print("拒绝启用 guard：审批目录在守卫启用前已存在内容，请由人类检查后重新初始化。", file=sys.stderr)
+                return 2
+            if guard_result == "created":
+                created.append(Path(".agents/protocol/guard.json"))
+        if args.hook_mode == "on":
+            if args.guard_mode == "off":
+                # hook-only 警告：hook 会持续 fail-closed
+                print(
+                    "WARNING: --hook-only 让 hook 持续 fail-closed（找不到 guard.json）；"
+                    "仅用于调试。请补一个 --guard=on。",
+                    file=sys.stderr,
+                )
             if write_project_hook(root):
                 created.append(Path(".zcode/config.json"))
             else:
                 print("已存在 .zcode/config.json，未覆盖；请人工检查其 hook 是否指向 Protocol 守卫。", file=sys.stderr)
+
     print(f"项目根: {root}")
     if created:
         print("已创建:")

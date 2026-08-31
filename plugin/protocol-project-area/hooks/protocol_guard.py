@@ -108,6 +108,12 @@ def is_protected(relative: Path) -> bool:
     return any(relative == prefix or prefix in relative.parents for prefix in PROTECTED_PREFIXES)
 
 
+def _path_under_verification(relative: Path) -> bool:
+    """观察-only 模式下 verification/ 也受保护：公司项目不允许 agent 改写验证报告。"""
+    verification = AGENT_PROTOCOL_PREFIX / "verification"
+    return relative == verification or verification in relative.parents
+
+
 def load_guard(root: Path) -> dict[str, Any] | None:
     guard_path = root / GUARD_RELATIVE_PATH
     try:
@@ -281,14 +287,26 @@ def evaluate(payload: dict[str, Any], now: datetime | None = None) -> Decision:
         return Decision(False, "无法确认目标文件是否在已初始化项目内，拒绝写入")
     if is_protected(relative):
         return Decision(False, "guard 与人类批准/豁免文件受保护，主施工 agent 不得修改")
-    if is_project_area_document(relative):
-        return Decision(True, "项目区理解与流程文档允许写入")
 
     guard = load_guard(root)
     if guard is None:
         return Decision(False, "guard 状态损坏或不可读；对代码路径 fail-closed")
     if guard.get("status") != "pending":
         return Decision(False, "guard 状态无效；对代码路径 fail-closed")
+
+    # observe-only 模式（公司项目/纯只读场景）：
+    # 业务路径一律拒绝，项目区文档放行。无需人类签发批准。
+    # 必须放在 is_project_area_document 之前，否则 observe-only 命中也走不到这个分支
+    if guard.get("intent") == "observe-only":
+        # observe-only 模式额外保护 verification/：公司项目不允许 agent 改写验证报告
+        if _path_under_verification(relative):
+            return Decision(False, "observe-only 模式：验证报告受保护，主施工 agent 不得修改")
+        if is_project_area_document(relative):
+            return Decision(True, "observe-only 模式：项目区资产允许写入")
+        return Decision(False, "observe-only 模式：本项目不允许任何业务代码写入")
+
+    if is_project_area_document(relative):
+        return Decision(True, "项目区理解与流程文档允许写入")
 
     current = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
     if has_matching_approval(root, relative, now):

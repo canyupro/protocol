@@ -72,6 +72,32 @@ class ProtocolGuardTest(unittest.TestCase):
         self.assertFalse(decision.allowed)
         self.assertIn("最低理解标准", decision.reason)
 
+    # ── PR 2: observe-only 模式（read-only 项目）──
+
+    def test_observe_only_blocks_source_write(self) -> None:
+        """observe-only：业务路径一律 deny，不需要人类批准。"""
+        self.initialize(content='{"version":1,"status":"pending","intent":"observe-only"}')
+        decision = protocol_guard.evaluate(self.payload(self.source))
+        self.assertFalse(decision.allowed)
+        self.assertIn("observe-only", decision.reason)
+        self.assertIn("不允许任何业务代码写入", decision.reason)
+
+    def test_observe_only_allows_project_document(self) -> None:
+        """observe-only：项目区文档（如理解文档、问卷）仍可写。"""
+        self.initialize(content='{"version":1,"status":"pending","intent":"observe-only"}')
+        document = self.root / "doc/protocol/understanding/naming.md"
+        decision = protocol_guard.evaluate(self.payload(document))
+        self.assertTrue(decision.allowed)
+        self.assertIn("observe-only", decision.reason)
+
+    def test_observe_only_blocks_verification_directory(self) -> None:
+        """observe-only：verification/ 仍受 PROTECTED 规则约束（独立验证方才能写）。"""
+        self.initialize(content='{"version":1,"status":"pending","intent":"observe-only"}')
+        target = self.root / ".agents/protocol/verification/understanding-review.md"
+        decision = protocol_guard.evaluate(self.payload(target))
+        self.assertFalse(decision.allowed)
+        self.assertIn("受保护", decision.reason)
+
     def test_pending_guard_allows_project_document(self) -> None:
         self.initialize()
         document = self.root / "doc/protocol/understanding/naming.md"
