@@ -221,6 +221,59 @@ def _project_level_from_guard(root: Path) -> str:
     return "unknown"
 
 
+def _task_status_from_task_md(root: Path) -> tuple[str, str]:
+    """读 task.md，定位「任务生命周期」段，返回 (当前状态, 行号)。
+
+    优先匹配模板新增的「任务生命周期」段（单行 bullet `- 当前状态：xxx`）。
+    若该段不存在则返回 (空串, 0)，由调用方决定是否回退到兼容写法。
+    """
+    path = root / ".agents/protocol/task.md"
+    try:
+        text = path.read_text(encoding="utf-8")
+    except OSError:
+        return ("", 0)
+    in_section = False
+    for idx, line in enumerate(text.splitlines(), 1):
+        if line.strip() == "## 任务生命周期":
+            in_section = True
+            continue
+        if in_section:
+            if line.startswith("## "):
+                break
+            if line.strip().startswith("- 当前状态：") or line.strip().startswith("- 当前状态:"):
+                value = line.split("：", 1)[-1].split(":", 1)[-1].strip()
+                return (value, idx)
+    return ("", 0)
+
+
+def task_is_aborted(root: Path) -> bool:
+    """判定当前任务是否已撤回。
+
+    优先识别模板新增的「任务生命周期」段 `- 当前状态：已撤回`。
+    若该段缺失或写法不规范，回退到全文扫描兼容写法：
+      - 「## 任务」或「## 事实状态」段内含「整体撤回」/「任务已撤回」等关键词。
+    """
+    status, _ = _task_status_from_task_md(root)
+    if status.startswith("已撤回"):
+        return True
+
+    # 兼容写法扫描
+    path = root / ".agents/protocol/task.md"
+    try:
+        text = path.read_text(encoding="utf-8")
+    except OSError:
+        return False
+    keywords = ("整体撤回", "任务已撤回", "任务已废止", "已废弃", "已撤销")
+    in_relevant_section = False
+    for line in text.splitlines():
+        if line.startswith("## "):
+            in_relevant_section = line.strip() in {"## 任务", "## 任务生命周期", "## 事实状态"}
+            continue
+        if in_relevant_section and any(kw in line for kw in keywords):
+            return True
+    return False
+
+
 def has_matching_approval(root: Path, relative: Path, now: datetime | None = None) -> bool:
     """检查是否有人类签发的理解批准，且目标路径落在批准范围内。
 
@@ -228,7 +281,13 @@ def has_matching_approval(root: Path, relative: Path, now: datetime | None = Non
       - production / team: 必填批准到期 ISO8601，默认 90 天
       - personal: 允许不填批准到期（即默认无过期约束）
       - unknown: 默认 production 行为（保守）
+
+    PR 4：任务已撤回时，批准自动失效，guard 拒绝所有 Edit/Write。
     """
+    # PR 4 联动：任务已撤回 → 批准失效（无需人类重签，由下次 begin 重新进入）
+    if task_is_aborted(root):
+        return False
+
     path = root / "doc/protocol/approvals/understanding-approved.md"
     try:
         text = path.read_text(encoding="utf-8")

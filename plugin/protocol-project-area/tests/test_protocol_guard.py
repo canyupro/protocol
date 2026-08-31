@@ -302,6 +302,129 @@ class ProtocolGuardTest(unittest.TestCase):
         decision = protocol_guard.evaluate(self.payload(self.source))
         self.assertFalse(decision.allowed)
 
+    # ── PR 4: 任务生命周期 + 守卫联动 ──
+
+    def _write_task_md(self, body: str) -> None:
+        """初始化 project_area 后写入 task.md。"""
+        task = self.root / ".agents/protocol/task.md"
+        task.parent.mkdir(parents=True, exist_ok=True)
+        task.write_text(body, encoding="utf-8")
+
+    def test_task_status_extracted_from_lifecycle_section(self) -> None:
+        """模板新增的「任务生命周期」段 `- 当前状态：已撤回` 应被识别。"""
+        self.initialize()
+        self._write_task_md(
+            "# 当前任务与权限边界\n\n"
+            "## 任务生命周期\n\n"
+            "- 当前状态：进行中\n"
+            "- 开始时间（ISO8601）：2026-08-14T00:00:00+00:00\n\n"
+            "## 任务\n\n- 目标：x\n"
+        )
+        status, line = protocol_guard._task_status_from_task_md(self.root)
+        self.assertEqual(status, "进行中")
+        self.assertEqual(line, 5)  # L1 标题, L2 空行, L3 开始时间, L4 当前状态
+
+    def test_task_status_with_brackets_date_in_aborted(self) -> None:
+        """「已撤回」后括号带日期也能识别。"""
+        self.initialize()
+        self._write_task_md(
+            "## 任务生命周期\n\n"
+            "- 当前状态：已撤回（2026-08-28）\n"
+        )
+        status, _ = protocol_guard._task_status_from_task_md(self.root)
+        self.assertTrue(status.startswith("已撤回"))
+
+    def test_task_status_returns_empty_if_section_missing(self) -> None:
+        """无「任务生命周期」段时，状态为空（由调用方回退到兼容写法）。"""
+        self.initialize()
+        self._write_task_md("## 任务\n\n- 目标：x\n")
+        status, _ = protocol_guard._task_status_from_task_md(self.root)
+        self.assertEqual(status, "")
+
+    def test_task_is_aborted_recognizes_lifecycle_section(self) -> None:
+        self.initialize()
+        self._write_task_md("## 任务生命周期\n\n- 当前状态：已撤回（2026-09-01）\n")
+        self.assertTrue(protocol_guard.task_is_aborted(self.root))
+
+    def test_task_is_aborted_false_for_in_progress(self) -> None:
+        self.initialize()
+        self._write_task_md("## 任务生命周期\n\n- 当前状态：进行中\n")
+        self.assertFalse(protocol_guard.task_is_aborted(self.root))
+
+    def test_task_is_aborted_legacy_prose_in_task_section(self) -> None:
+        """兼容写法：「整体撤回」写在 ## 任务 段的 prose 里（appcode-fend 当前就是这样）。"""
+        self.initialize()
+        self._write_task_md(
+            "## 任务\n\n"
+            "- 目标：**闲置**，2026-08-28 起按使用者指示**整体撤回**\n"
+        )
+        self.assertTrue(protocol_guard.task_is_aborted(self.root))
+
+    def test_task_is_aborted_legacy_prose_in_fact_section(self) -> None:
+        self.initialize()
+        self._write_task_md(
+            "## 事实状态\n\n"
+            "- 2026-08-28 「在店顾客列表」整体撤回，工作区回到开发前状态\n"
+        )
+        self.assertTrue(protocol_guard.task_is_aborted(self.root))
+
+    def test_task_is_aborted_false_for_irrelevant_text(self) -> None:
+        """无关文本不应误判。"""
+        self.initialize()
+        self._write_task_md("## 任务\n\n- 目标：增加 A 功能\n## 事实状态\n\n- 已验证事实：1+1=2\n")
+        self.assertFalse(protocol_guard.task_is_aborted(self.root))
+
+    def test_guard_rejects_write_after_task_aborted(self) -> None:
+        """PR 4 核心联动：任务已撤回 → 批准失效 → guard 拒绝源代码写入。
+
+        appcode-fend 当前现状：'整体撤回' 写在任务段 prose 里。
+        按 PR 4 修复，批准应自动失效，源代码 Edit/Write 全部被拒。
+        """
+        self.initialize()
+        # 签发一份 effective 批准（personal 项目，不强制 expiry）
+        path = self.root / "doc/protocol/approvals/understanding-approved.md"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(
+            "# 人类批准：最低理解标准\n\n"
+            "- 批准人：canyu\n"
+            "- 批准时间（ISO8601）：2026-08-28T14:00:00+00:00\n"
+            "- 批准范围：\n"
+            "  - src\n",
+            encoding="utf-8",
+        )
+        # 在确认批准前写入 task.md（先有 task，再有 approval，符合实际时序）
+        self._write_task_md(
+            "## 任务\n\n"
+            "- 目标：闲置，整体撤回\n"
+        )
+        # 任务被撤回后，guard 应拒绝源代码写入
+        decision = protocol_guard.evaluate(self.payload(self.source))
+        self.assertFalse(decision.allowed)
+        self.assertIn("最低理解标准", decision.reason)
+
+    def test_guard_allows_write_after_task_aborted_when_task_resumes(self) -> None:
+        """任务从「已撤回」恢复为「进行中」（例如人类下次 /protocol:begin 触发新任务），批准重新生效。"""
+        self.initialize()
+        path = self.root / "doc/protocol/approvals/understanding-approved.md"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(
+            "# 人类批准：最低理解标准\n\n"
+            "- 批准人：canyu\n"
+            "- 批准时间（ISO8601）：2026-08-28T14:00:00+00:00\n"
+            "- 批准范围：\n"
+            "  - src\n",
+            encoding="utf-8",
+        )
+        # 当前状态：已撤回 → guard 拒绝
+        self._write_task_md("## 任务生命周期\n\n- 当前状态：已撤回（2026-09-01）\n")
+        decision = protocol_guard.evaluate(self.payload(self.source))
+        self.assertFalse(decision.allowed)
+
+        # 任务恢复为「进行中」 → guard 通过
+        self._write_task_md("## 任务生命周期\n\n- 当前状态：进行中\n")
+        decision = protocol_guard.evaluate(self.payload(self.source))
+        self.assertTrue(decision.allowed)
+
     # ── 辅助方法 ──
 
     def _write_questionnaire_with_level(self, level_marker: str) -> None:
