@@ -158,6 +158,139 @@ class ProtocolGuardTest(unittest.TestCase):
         self.assertFalse(decision.allowed)
         self.assertIn("fail-closed", decision.reason)
 
+    # ── PR 1: main() fail-OPEN 改为 return 0 + stderr 告警 ──
+
+    def test_main_empty_stdin_returns_zero_with_stderr(self) -> None:
+        """空 stdin：无法判断 target/cwd → 放行 + stderr 告警（修正后 fail-OPEN 策略）。
+
+        归因：解析失败 = 不知道这次操作是否针对 protocol 项目 → 不应误伤所有无关 Edit/Write。
+        """
+        import subprocess
+        proc = subprocess.run(
+            [sys.executable, str(GUARD_PATH)],
+            input="", capture_output=True, text=True, timeout=10,
+        )
+        self.assertEqual(proc.returncode, 0)
+        self.assertIn("stdin empty", proc.stderr)
+
+    def test_main_bad_json_returns_zero_with_stderr(self) -> None:
+        """损坏 JSON：放行 + stderr 告警。"""
+        import subprocess
+        proc = subprocess.run(
+            [sys.executable, str(GUARD_PATH)],
+            input="{not json", capture_output=True, text=True, timeout=10,
+        )
+        self.assertEqual(proc.returncode, 0)
+        self.assertIn("not valid JSON", proc.stderr)
+
+    def test_main_payload_not_dict_returns_zero_with_stderr(self) -> None:
+        """payload 不是 dict（如数组）：放行 + stderr 告警。"""
+        import subprocess
+        proc = subprocess.run(
+            [sys.executable, str(GUARD_PATH)],
+            input="[1,2,3]", capture_output=True, text=True, timeout=10,
+        )
+        self.assertEqual(proc.returncode, 0)
+        self.assertIn("must be a JSON object", proc.stderr)
+
+    # ── PR 3: expiry 分级 + 范围约束修正 ──
+
+    def test_approval_personal_project_no_expiry_required(self) -> None:
+        """个人/实验项目：批准人不填 expiry，批准仍生效（不再误伤单人项目）。"""
+        self.initialize()
+        self._write_questionnaire_with_level("个人 / 实验项目")
+        path = self.root / "doc/protocol/approvals/understanding-approved.md"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(
+            "# 人类批准：最低理解标准\n\n"
+            "- 批准人：canyu\n"
+            "- 批准时间（ISO8601）：2026-08-14T00:00:00+00:00\n"
+            # 故意不填批准到期
+            "- 批准范围：\n"
+            "  - src\n",
+            encoding="utf-8",
+        )
+        decision = protocol_guard.evaluate(self.payload(self.source))
+        self.assertTrue(decision.allowed)
+
+    def test_approval_production_project_expires_after_90_days(self) -> None:
+        """生产级项目：批准到期默认 90 天，过期后拒绝。"""
+        self.initialize()
+        self._write_questionnaire_with_level("已上线生产级项目")
+        path = self.root / "doc/protocol/approvals/understanding-approved.md"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(
+            "# 人类批准：最低理解标准\n\n"
+            "- 批准人：负责人\n"
+            "- 批准时间（ISO8601）：2026-08-14T00:00:00+00:00\n"
+            # 故意不填批准到期 → 默认 90 天
+            "- 批准范围：\n"
+            "  - src\n",
+            encoding="utf-8",
+        )
+        # 89 天后仍有效
+        almost_expired = datetime(2026, 11, 10, tzinfo=timezone.utc)
+        decision = protocol_guard.evaluate(self.payload(self.source), now=almost_expired)
+        self.assertTrue(decision.allowed)
+        # 91 天后过期
+        expired = datetime(2026, 11, 12, tzinfo=timezone.utc)
+        decision = protocol_guard.evaluate(self.payload(self.source), now=expired)
+        self.assertFalse(decision.allowed)
+
+    def test_approval_team_project_expires_after_90_days(self) -> None:
+        """团队内部可控项目：与生产级一致，90 天默认过期。"""
+        self.initialize()
+        self._write_questionnaire_with_level("团队内部可控系统")
+        path = self.root / "doc/protocol/approvals/understanding-approved.md"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(
+            "# 人类批准：最低理解标准\n\n"
+            "- 批准人：负责人\n"
+            "- 批准时间（ISO8601）：2026-08-14T00:00:00+00:00\n"
+            "- 批准范围：\n"
+            "  - src\n",
+            encoding="utf-8",
+        )
+        expired = datetime(2026, 11, 12, tzinfo=timezone.utc)
+        decision = protocol_guard.evaluate(self.payload(self.source), now=expired)
+        self.assertFalse(decision.allowed)
+
+    def test_scope_normalization_rejects_parent_traversal(self) -> None:
+        """`../src` 在新版归一化下被识别为非法 scope（防语义误解，非防逃逸）。
+
+        注意：原 lstrip('./') 会字符集剥离导致 '../src' → 'src' 静默匹配项目根内 src。
+        新版用 Path.parts 检测 .. 段，返回空，scope 不匹配 → 拒绝。
+        """
+        self.initialize()
+        path = self.root / "doc/protocol/approvals/understanding-approved.md"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(
+            "# 人类批准：最低理解标准\n\n"
+            "- 批准人：负责人\n"
+            "- 批准时间（ISO8601）：2026-08-14T00:00:00+00:00\n"
+            "- 批准范围：\n"
+            "  - ../src\n",
+            encoding="utf-8",
+        )
+        # ../src 不应静默匹配项目根内的 src/，应被拒
+        decision = protocol_guard.evaluate(self.payload(self.source))
+        self.assertFalse(decision.allowed)
+
+    # ── 辅助方法 ──
+
+    def _write_questionnaire_with_level(self, level_marker: str) -> None:
+        """在 00-基础调查问卷.md 第 5 节写入指定等级标记。"""
+        q = self.root / "doc/protocol/00-基础调查问卷.md"
+        if not q.exists():
+            q.parent.mkdir(parents=True, exist_ok=True)
+            q.write_text("", encoding="utf-8")
+        text = q.read_text(encoding="utf-8")
+        # 注入最小可触发识别结构（用层级 marker，模拟问卷勾选）
+        if level_marker not in text:
+            # 直接追加到问卷末尾
+            with q.open("a", encoding="utf-8") as f:
+                f.write(f"\n- {level_marker}\n")
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -12,7 +12,7 @@ import json
 import os
 import sys
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
@@ -170,10 +170,23 @@ def _parse_datetime(value: str | None) -> datetime | None:
     return parsed.astimezone(timezone.utc)
 
 
+def _normalize_scope_for_display(scope: str) -> str:
+    """归一化 scope 仅用于比较展示：不改变空语义。
+
+    原 lstrip("./") 会字符集剥离：'../src' → 'src'（不是 '../../../src'）。
+    这会让用户写 '../src' 静默匹配项目根内 src，语义被悄悄改变。
+    这里仅 strip + rstrip，不做 lstrip；对含 .. 段的 scope 视为非法（返回 ''）。
+    """
+    candidate = scope.strip().rstrip("/")
+    if ".." in Path(candidate).parts:
+        return ""
+    return candidate
+
+
 def _scope_matches(relative: Path, scopes: list[str]) -> bool:
     normalized = relative.as_posix()
     for scope in scopes:
-        candidate = scope.strip().lstrip("./").rstrip("/")
+        candidate = _normalize_scope_for_display(scope)
         if not candidate:
             continue
         if candidate in {"*", "."}:
@@ -183,16 +196,61 @@ def _scope_matches(relative: Path, scopes: list[str]) -> bool:
     return False
 
 
-def has_matching_approval(root: Path, relative: Path) -> bool:
+def _project_level_from_guard(root: Path) -> str:
+    """从 questionnaire 第 5 节识别项目等级（个人/实验/生产级/未指定）。
+
+    用于 PR 3 修正：expiry 分级。返回小写字符串；不在 4 个枚举内返回 "unknown"。
+    """
+    q = root / "doc" / "protocol" / "00-基础调查问卷.md"
+    try:
+        text = q.read_text(encoding="utf-8")
+    except OSError:
+        return "unknown"
+    if "已上线生产级项目" in text:
+        return "production"
+    if "团队内部可控系统" in text:
+        return "team"
+    if "个人 / 实验项目" in text:
+        return "personal"
+    return "unknown"
+
+
+def has_matching_approval(root: Path, relative: Path, now: datetime | None = None) -> bool:
+    """检查是否有人类签发的理解批准，且目标路径落在批准范围内。
+
+    PR 3 修正：expiry 分级。
+      - production / team: 必填批准到期 ISO8601，默认 90 天
+      - personal: 允许不填批准到期（即默认无过期约束）
+      - unknown: 默认 production 行为（保守）
+    """
     path = root / "doc/protocol/approvals/understanding-approved.md"
     try:
         text = path.read_text(encoding="utf-8")
     except OSError:
         return False
     approver = _field_value(text, "批准人")
-    signed_at = _field_value(text, "批准时间（ISO8601）")
+    signed_at = _parse_datetime(_field_value(text, "批准时间（ISO8601）"))
     scopes = _list_after_label(text, "批准范围：")
-    return bool(approver and _parse_datetime(signed_at) and _scope_matches(relative, scopes))
+    if not approver or not signed_at:
+        return False
+
+    level = _project_level_from_guard(root)
+    expiry_raw = _field_value(text, "批准到期（ISO8601）")
+    expiry_at = _parse_datetime(expiry_raw)
+
+    if level == "personal":
+        # 单人项目：批准人就是用户自己，不需要 expiry 硬约束
+        pass
+    else:
+        # 生产 / 团队 / 未知：默认 90 天过期
+        if expiry_at is None:
+            expiry_at = signed_at + timedelta(days=90)
+        # 接受 evaluate(now=...) 注入以保证测试可重现
+        current = now or datetime.now(timezone.utc)
+        if expiry_at <= current.astimezone(timezone.utc):
+            return False
+
+    return _scope_matches(relative, scopes)
 
 
 def has_matching_exemption(root: Path, relative: Path, now: datetime) -> bool:
@@ -233,7 +291,7 @@ def evaluate(payload: dict[str, Any], now: datetime | None = None) -> Decision:
         return Decision(False, "guard 状态无效；对代码路径 fail-closed")
 
     current = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
-    if has_matching_approval(root, relative):
+    if has_matching_approval(root, relative, now):
         return Decision(True, "存在匹配范围的人类理解批准")
     if has_matching_exemption(root, relative, current):
         return Decision(True, "存在匹配范围且未过期的人类书面豁免")
@@ -244,11 +302,44 @@ def evaluate(payload: dict[str, Any], now: datetime | None = None) -> Decision:
 
 
 def main() -> int:
-    try:
-        payload = json.load(sys.stdin)
-    except (json.JSONDecodeError, OSError):
+    payload_text = sys.stdin.read()
+
+    # 空 stdin：客户端可能因异常管道发送空数据。
+    # 无法判断 target / cwd → 没有证据说这次调用应该被拦 → return 0 放行，
+    # 但 stderr 必须留下可观测的告警，让运维能发现 hook 异常。
+    if not payload_text.strip():
+        sys.stderr.write(
+            "Protocol guard: stdin empty; unable to evaluate (allowing; "
+            "this typically indicates a ZCode hook delivery bug — check client logs)\n"
+        )
         return 0
-    decision = evaluate(payload)
+
+    try:
+        payload = json.loads(payload_text)
+    except json.JSONDecodeError as exc:
+        sys.stderr.write(
+            f"Protocol guard: stdin is not valid JSON ({exc.msg} "
+            f"@ line {exc.lineno} col {exc.colno}); allowing; "
+            f"this typically indicates a ZCode hook delivery bug — check client logs)\n"
+        )
+        return 0
+
+    if not isinstance(payload, dict):
+        sys.stderr.write(
+            "Protocol guard: payload must be a JSON object; allowing; "
+            "check ZCode hook delivery version)\n"
+        )
+        return 0
+
+    try:
+        decision = evaluate(payload)
+    except Exception as exc:  # noqa: BLE001
+        sys.stderr.write(
+            f"Protocol guard: internal error {type(exc).__name__}: {exc}; "
+            f"allowing; this is a bug in the guard script — please report)\n"
+        )
+        return 0
+
     if decision.allowed:
         return 0
     sys.stderr.write(f"Protocol guard: {decision.reason}\n")
