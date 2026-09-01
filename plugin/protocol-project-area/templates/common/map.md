@@ -2,6 +2,15 @@
 
 > 本文件只连接 Protocol 项目区关键资产，不生成全仓 INDEX。
 
+## 流程元数据
+
+> 由 agent 在 `/protocol:begin` 时自动写入，禁止手填覆盖。
+
+- 最近一次 begin：YYYY-MM-DDTHH:MM:SSZ
+- 最近一次发起方：human / agent-auto / scheduled
+- 最近一次会话 ID：
+- 上一次 begin：YYYY-MM-DDTHH:MM:SSZ
+
 ## 项目规则与入口
 
 | 类别 | 路径 | 状态/说明 |

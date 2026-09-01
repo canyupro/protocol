@@ -8,6 +8,8 @@
 
 - 当前状态：草稿 / 进行中 / 已撤回（YYYY-MM-DD）/ 已完成（YYYY-MM-DD）
 - 开始时间（ISO8601，由 agent 在 `/protocol:begin` 时自动写入，禁止手填覆盖）：
+- 发起方：human / agent-auto / scheduled
+- 当前会话 ID：
 - 撤回时间（ISO8601，撤回时填写）：
 - 撤回原因：
 - 撤回人：
